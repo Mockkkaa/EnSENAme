@@ -40,30 +40,42 @@ if (!empty($_SESSION['txtdoc'])) {
   <div class="navbar-wrapper">
     <div class="m-header">
       <a href="index.php" class="b-brand text-primary">
-        <img src="../admin/assets/images/logoensename.PNG" class="img-fluid" alt="">
+        <img src="../admin/assets/images/logoensenamenobg.png" alt="EnSEÑAme Logo" class="img-fluid" />
       </a>
     </div>
     <div class="navbar-content">
       <ul class="pc-navbar">
-        <li class="pc-item">
-          <a href="index.php" class="pc-link">
-            <span class="pc-micon"><i class="ti ti-dashboard"></i></span>
-            <span class="pc-mtext">Inicio</span>
-          </a>
-        </li>
-        <li class="pc-item">
-          <a href="producto.php" class="pc-link">
-            <span class="pc-micon"><i class="ti ti-book"></i></span>
-            <span class="pc-mtext">Guias</span>
-          </a>
-        </li>
-        <li class="pc-item">
-          <a href="servicio.php" class="pc-link">
-            <span class="pc-micon"><i class="ti ti-message-circle"></i></span>
-            <span class="pc-mtext">Chats</span>
-          </a>
-        </li>
-      </ul>
+          <li class="pc-item">
+            <a href="index.php" class="pc-link">
+              <span class="pc-micon"><i class="ti ti-dashboard"></i></span>
+              <span class="pc-mtext">Inicio</span>
+            </a>
+          </li>
+          <li class="pc-item">
+            <a href="producto.php" class="pc-link">
+              <span class="pc-micon"><i class="ti ti-book"></i></span>
+              <span class="pc-mtext">Guías LSC</span>
+            </a>
+          </li>
+          <li class="pc-item">
+            <a href="chatbot.php" class="pc-link">
+              <span class="pc-micon"><i class="ti ti-robot"></i></span>
+              <span class="pc-mtext">Asistente Virtual</span>
+            </a>
+          </li>
+          <li class="pc-item">
+            <a href="chat.php" class="pc-link">
+              <span class="pc-micon"><i class="ti ti-brand-hipchat"></i></span>
+              <span class="pc-mtext">Chat</span>
+            </a>
+          </li>
+          <li class="pc-item">
+            <a href="servicio.php" class="pc-link active">
+              <span class="pc-micon"><i class="ti ti-headset"></i></span>
+              <span class="pc-mtext">Servicios</span>
+            </a>
+          </li>
+        </ul>
     </div>
   </div>
 </nav>
