@@ -99,6 +99,10 @@
             <div><strong>Estado:</strong> <span id="statusText" class="mono">Inicializando...</span></div>
             <div><strong>Texto:</strong></div>
             <textarea id="textoAcumulado" class="mono" rows="3" style="width:100%;resize:vertical;" readonly></textarea>
+            <div class="controls" style="margin:6px 0 10px 0;">
+              <button id="btnCopyText" class="btn btn-outline" title="Copiar texto acumulado al portapapeles"><i class="ti ti-copy"></i> Copiar</button>
+              <button id="btnClearText" class="btn btn-secondary" title="Borrar texto acumulado"><i class="ti ti-trash"></i> Borrar</button>
+            </div>
             <div><strong>Ejemplos totales:</strong> <span id="exCount" class="mono">0</span></div>
             <div><strong>Último error:</strong> <span id="lastErr" class="mono">—</span></div>
           </div>
@@ -140,7 +144,9 @@
       btnStreamStop: document.getElementById('btnStreamStop'),
       btnSave: document.getElementById('btnSave'),
       btnLoad: document.getElementById('btnLoad'),
-      btnLoadDefault: document.getElementById('btnLoadDefault')
+      btnLoadDefault: document.getElementById('btnLoadDefault'),
+      btnCopyText: document.getElementById('btnCopyText'),
+      btnClearText: document.getElementById('btnClearText')
     };
 
     function setStatus(msg, cls) {
@@ -306,6 +312,15 @@
     els.btnSave.addEventListener('click', saveLocal);
     els.btnLoad.addEventListener('click', loadLocal);
     els.btnLoadDefault.addEventListener('click', loadDefault);
+    els.btnClearText.addEventListener('click', ()=>{ try{ els.out.value=''; setStatus('Texto borrado','warn'); }catch{} });
+    els.btnCopyText.addEventListener('click', async ()=>{
+      try{
+        const txt = els.out.value||'';
+        if (navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(txt); }
+        else { const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+        setStatus('Texto copiado','ok');
+      }catch(e){ els.err.textContent = String(e); setStatus('No se pudo copiar','err'); }
+    });
 
     // Teclas: Enter agrega la letra actual; Espacio agrega un espacio
     document.addEventListener('keydown', (e)=>{
