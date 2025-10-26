@@ -52,7 +52,7 @@
           <span class="logo-text">LSC Portable (sin backend)</span>
         </div>
         <div class="inline">
-          <a href="./index.html" class="back-btn"><i class="ti ti-robot"></i> Ir a versión Flask</a>
+          <a href="../index.html" class="back-btn"><i class="ti ti-brain"></i> Ir a Entrenamiento</a>
           <a href="../../user/index.php" class="back-btn"><i class="ti ti-arrow-left"></i> Volver</a>
         </div>
       </div>
@@ -81,17 +81,14 @@
       </div>
 
       <div class="card">
-        <div class="card-header"><i class="ti ti-brain"></i> Entrenamiento y predicción</div>
+        <div class="card-header"><i class="ti ti-language"></i> Traducción</div>
         <div class="card-body">
           <div class="controls" style="margin-bottom:10px;">
-            <button id="btnAdd" class="btn btn-success"><i class="ti ti-plus"></i> Agregar ejemplo</button>
             <button id="btnPredict" class="btn btn-warning"><i class="ti ti-bolt"></i> Predecir (1 captura)</button>
             <button id="btnStreamStart" class="btn btn-warning"><i class="ti ti-player-play"></i> Iniciar continuo</button>
             <button id="btnStreamStop" class="btn btn-danger"><i class="ti ti-player-pause"></i> Detener continuo</button>
           </div>
           <div class="controls" style="margin-bottom:10px;">
-            <input id="labelInput" type="text" placeholder="Nombre de la seña (ej. Hola)" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;flex:1;min-width:200px;">
-            <button id="btnSave" class="btn btn-outline"><i class="ti ti-download"></i> Guardar modelo</button>
             <button id="btnLoad" class="btn btn-outline"><i class="ti ti-upload"></i> Cargar modelo</button>
             <button id="btnLoadDefault" class="btn btn-outline" title="Cargar modelo de ejemplo del servidor"><i class="ti ti-cloud-download"></i> Cargar Modelo (Defecto)</button>
           </div>
@@ -137,12 +134,10 @@
       out: document.getElementById('textoAcumulado'),
       exCount: document.getElementById('exCount'),
       err: document.getElementById('lastErr'),
-      label: document.getElementById('labelInput'),
-      btnAdd: document.getElementById('btnAdd'),
+      
       btnPredict: document.getElementById('btnPredict'),
       btnStreamStart: document.getElementById('btnStreamStart'),
       btnStreamStop: document.getElementById('btnStreamStop'),
-      btnSave: document.getElementById('btnSave'),
       btnLoad: document.getElementById('btnLoad'),
       btnLoadDefault: document.getElementById('btnLoadDefault'),
       btnCopyText: document.getElementById('btnCopyText'),
@@ -305,11 +300,9 @@
     // Wire UI
     document.getElementById('btnStartCam').addEventListener('click', startCamera);
     document.getElementById('btnStopCam').addEventListener('click', stopCamera);
-    els.btnAdd.addEventListener('click', addExample);
     els.btnPredict.addEventListener('click', predictOnce);
     els.btnStreamStart.addEventListener('click', startStreaming);
     els.btnStreamStop.addEventListener('click', stopStreaming);
-    els.btnSave.addEventListener('click', saveLocal);
     els.btnLoad.addEventListener('click', loadLocal);
     els.btnLoadDefault.addEventListener('click', loadDefault);
     els.btnClearText.addEventListener('click', ()=>{ try{ els.out.value=''; setStatus('Texto borrado','warn'); }catch{} });
