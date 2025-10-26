@@ -97,8 +97,8 @@
           </div>
           <div class="status">
             <div><strong>Estado:</strong> <span id="statusText" class="mono">Inicializando...</span></div>
-            <div><strong>Seña:</strong> <span id="predText" class="mono">—</span></div>
-            <div><strong>Confianza:</strong> <span id="confText" class="mono">—</span></div>
+            <div><strong>Texto:</strong></div>
+            <textarea id="textoAcumulado" class="mono" rows="3" style="width:100%;resize:vertical;" readonly></textarea>
             <div><strong>Ejemplos totales:</strong> <span id="exCount" class="mono">0</span></div>
             <div><strong>Último error:</strong> <span id="lastErr" class="mono">—</span></div>
           </div>
@@ -130,8 +130,7 @@
     const els = {
       badge: document.getElementById('statusBadge'),
       text: document.getElementById('statusText'),
-      pred: document.getElementById('predText'),
-      conf: document.getElementById('confText'),
+      out: document.getElementById('textoAcumulado'),
       exCount: document.getElementById('exCount'),
       err: document.getElementById('lastErr'),
       label: document.getElementById('labelInput'),
@@ -194,13 +193,17 @@
       setStatus(`Ejemplo agregado a "${label}"`,'ok');
     }
 
+    let currentLabel = '';
+
+    function appendText(s){ try { els.out.value += s; els.out.scrollTop = els.out.scrollHeight; } catch{} }
+
     async function predictOnce() {
       try {
         if (classifier.getNumClasses()===0) { setStatus('Entrena primero','warn'); return; }
         const activation = getActivation();
         const res = await classifier.predictClass(activation);
-        const label = res.label || '—'; const conf = res.confidences[label]||0;
-        els.pred.textContent = label; els.conf.textContent = Math.round(conf*100)+'%';
+        const label = res.label || '';
+        currentLabel = label;
       } catch(e) { els.err.textContent = e.toString(); }
     }
 
@@ -303,6 +306,14 @@
     els.btnSave.addEventListener('click', saveLocal);
     els.btnLoad.addEventListener('click', loadLocal);
     els.btnLoadDefault.addEventListener('click', loadDefault);
+
+    // Teclas: Enter agrega la letra actual; Espacio agrega un espacio
+    document.addEventListener('keydown', (e)=>{
+      const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+      if (tag==='INPUT' || tag==='TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+      if (e.key === 'Enter') { e.preventDefault(); if (currentLabel) appendText(currentLabel); }
+      else if (e.key === ' ') { e.preventDefault(); appendText(' '); }
+    });
 
     // Boot
     loadModel();
