@@ -508,6 +508,15 @@
                     <button type="button" class="btn btn-warning btn-sm" onclick="load()">
                         <i class="fas fa-upload"></i> Cargar Modelo
                     </button>
+                    <button type="button" class="btn btn-warning btn-sm" onclick="predictOnce()" title="Realiza una sola predicción">
+                        <i class="ti ti-bolt"></i> Predecir (1 captura)
+                    </button>
+                    <button type="button" class="btn btn-warning btn-sm" onclick="startStreaming()" title="Inicia predicción continua cada segundo">
+                        <i class="ti ti-player-play"></i> Iniciar continuo
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="stopStreaming()" title="Detiene la predicción continua">
+                        <i class="ti ti-player-pause"></i> Detener continuo
+                    </button>
                   <button type="button" class="btn btn-outline-secondary btn-sm" onclick="loadDefault()" title="Cargar modelo de ejemplo del servidor">
                       <i class="ti ti-download"></i> Cargar Modelo (Defecto)
                   </button>
@@ -538,6 +547,7 @@
             examples: {},
             classNames: []
         };
+        let streamTimer = null;
 
         // Soporte para cargar modelo por defecto desde repo externo con fallback local
         const urlParams = new URLSearchParams(location.search);
@@ -620,38 +630,26 @@
                 console.log(`Ejemplo agregado para la clase: ${className}`);
             }
             
-            // Función para predecir la seña
-            async function predict() {
+            // Predicción de una sola captura
+            async function predictOnce() {
                 if (classifier.getNumClasses() === 0) {
-                    predictionText.textContent = 'Primero entrena el modelo con algunas señas';
+                    predictionText.textContent = 'Primero entrena o carga un modelo';
                     return;
                 }
-                
-                // Capturar el frame actual del video
                 const img = tf.browser.fromPixels(video);
                 const processedImg = tf.image.resizeBilinear(img, [224, 224]);
                 const batchedImg = processedImg.expandDims(0);
-                
-                // Obtener las activaciones de MobileNet
                 const activation = mobilenet.predict(batchedImg);
-                
-                // Predecir la clase
                 const result = await classifier.predictClass(activation);
-                
-                // Mostrar el resultado
                 predictionText.textContent = `Seña: ${result.label}`;
-                const confidence = Math.round(result.confidences[result.label] * 100);
+                const confidence = Math.round((result.confidences[result.label]||0) * 100);
                 confidenceLevel.style.width = `${confidence}%`;
                 confidenceValue.textContent = `${confidence}% de confianza`;
-                
-                // Liberar memoria
-                img.dispose();
-                processedImg.dispose();
-                batchedImg.dispose();
-                
-                // Continuar prediciendo
-                setTimeout(predict, 1000);
+                img.dispose(); processedImg.dispose(); batchedImg.dispose();
             }
+
+            function startStreaming(){ if (streamTimer) return; streamTimer = setInterval(predictOnce, 1000); showStatus('Reconocimiento continuo iniciado','success'); }
+            function stopStreaming(){ if (streamTimer){ clearInterval(streamTimer); streamTimer=null; showStatus('Reconocimiento continuo detenido','warning'); } }
             
             // Función para guardar datos de entrenamiento localmente
             async function saveTrainingDataLocal() {
@@ -840,10 +838,13 @@
                 loadTrainingDataLocal();
             }
 
-            // Exponer carga por defecto
+            // Exponer funciones a botones
             window.loadDefault = function() {
                 loadDefaultTrainingData();
             }
+            window.predictOnce = function(){ predictOnce(); }
+            window.startStreaming = function(){ startStreaming(); }
+            window.stopStreaming = function(){ stopStreaming(); }
         });
     </script>
 
