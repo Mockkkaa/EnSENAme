@@ -233,7 +233,9 @@
         for(const cls of trainingData.classNames){ const list=trainingData.examples[cls]||[]; for(const ex of list){ const t=tf.tensor(ex,[1,1000]); classifier.addExample(t, cls); } }
         examplesAdded = trainingData.classNames.reduce((acc,cn)=>acc+(trainingData.examples[cn]?.length||0),0);
         els.exCount.textContent = String(examplesAdded);
-        setStatus('Modelo por defecto cargado','ok');
+        const nClases = trainingData.classNames.length;
+        if (nClases>0) { setStatus(`Modelo por defecto cargado (${nClases} clase${nClases===1?'':'s'})`,'ok'); }
+        else { setStatus('Modelo por defecto cargado (sin ejemplos)','warn'); }
       } catch(err){ els.err.textContent = err.toString(); setStatus('No se pudo cargar modelo por defecto','err'); }
     }
 
