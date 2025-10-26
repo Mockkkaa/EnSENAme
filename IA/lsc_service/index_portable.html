@@ -115,6 +115,18 @@
     let streamTimer=null; let examplesAdded=0;
     let trainingData = { examples: {}, classNames: [] };
 
+    // Soporte para cargar modelo por defecto desde repo externo (fallback a local)
+    const urlParams = new URLSearchParams(location.search);
+    const PARAM_MODEL_URL = urlParams.get('modelUrl');
+    const REMOTE_CANDIDATES = [
+      // Parametro explícito tiene prioridad
+      ...(PARAM_MODEL_URL ? [PARAM_MODEL_URL] : []),
+      // Rutas comunes en el repo indicado por el usuario
+      'https://raw.githubusercontent.com/DanielPedraza023/InterpretacionLSC/main/datos_entrenamiento_senas.json',
+      'https://raw.githubusercontent.com/DanielPedraza023/InterpretacionLSC/main/base%20de%20datos/datos_entrenamiento_senas%20(3).json'
+    ];
+    const LOCAL_DEFAULT_URL = './assets/models/default_training.json';
+
     const els = {
       badge: document.getElementById('statusBadge'),
       text: document.getElementById('statusText'),
@@ -223,14 +235,55 @@
       input.click();
     }
 
+    function unique(arr){ return Array.from(new Set(arr)); }
+    function normalizeTrainingData(loaded){
+      // A) Formato nativo
+      if (loaded && Array.isArray(loaded.classNames) && loaded.examples && typeof loaded.examples==='object') {
+        return loaded;
+      }
+      // B) { labels:[], vectors:[ [1000], ... ] }
+      if (loaded && Array.isArray(loaded.labels) && Array.isArray(loaded.vectors)){
+        const ex = {}; const names = unique(loaded.labels);
+        for(let i=0;i<loaded.labels.length;i++){
+          const lab = String(loaded.labels[i]||'');
+          const vec = loaded.vectors[i]; if(!Array.isArray(vec)) continue;
+          (ex[lab] ||= []).push(vec);
+        }
+        return { classNames: names, examples: ex };
+      }
+      // C) { classes:[], data: { label: [[1000], ...] } }
+      if (loaded && Array.isArray(loaded.classes) && loaded.data && typeof loaded.data==='object'){
+        return { classNames: loaded.classes, examples: loaded.data };
+      }
+      // D) { examples:[ {label, vector} ], classNames? }
+      if (loaded && Array.isArray(loaded.examples)){
+        const ex={}; const names=[];
+        for(const item of loaded.examples){ if(!item) continue; const lab=String(item.label||''); const vec=item.vector; if(!Array.isArray(vec)) continue; (ex[lab] ||= []).push(vec); names.push(lab); }
+        return { classNames: unique(loaded.classNames||names), examples: ex };
+      }
+      throw new Error('Formato inválido');
+    }
+
+    async function fetchWithFallback(urls){
+      for (const u of urls){
+        try{
+          const res = await fetch(u, { cache:'no-store' });
+          if (res.ok){ return await res.json(); }
+        }catch(_){ /* ignorar y continuar */ }
+      }
+      // Intenta local al final
+      const res = await fetch(LOCAL_DEFAULT_URL, { cache:'no-store' });
+      if (!res.ok) throw new Error('HTTP '+res.status);
+      return await res.json();
+    }
+
     async function loadDefault() {
       try {
-        // Cargar desde ruta pública (evita 403 del directorio protegido "base de datos")
-        const url='./assets/models/default_training.json';
-        const res = await fetch(url,{cache:'no-store'}); if(!res.ok) throw new Error('HTTP '+res.status);
-        const loaded = await res.json();
-        if(!loaded || !Array.isArray(loaded.classNames) || !loaded.examples) throw new Error('Formato inválido');
-        trainingData=loaded; classifier.clearAllClasses();
+        // Intentar repo del usuario y luego fallback local
+        const loadedRaw = await fetchWithFallback(REMOTE_CANDIDATES);
+        const normalized = normalizeTrainingData(loadedRaw);
+        if(!normalized || !Array.isArray(normalized.classNames) || !normalized.examples) throw new Error('Formato inválido');
+        trainingData = normalized; classifier.clearAllClasses();
         for(const cls of trainingData.classNames){ const list=trainingData.examples[cls]||[]; for(const ex of list){ const t=tf.tensor(ex,[1,1000]); classifier.addExample(t, cls); } }
         examplesAdded = trainingData.classNames.reduce((acc,cn)=>acc+(trainingData.examples[cn]?.length||0),0);
         els.exCount.textContent = String(examplesAdded);
