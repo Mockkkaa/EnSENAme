@@ -52,7 +52,7 @@
           <span class="logo-text">LSC Portable (sin backend)</span>
         </div>
         <div class="inline">
-          <a href="../index.html" class="back-btn"><i class="ti ti-brain"></i> Ir a Entrenamiento</a>
+          <a href="../index.html" class="back-btn"><i class="ti ti-language"></i> Ir a Traducción</a>
           <a href="../../user/index.php" class="back-btn"><i class="ti ti-arrow-left"></i> Volver</a>
         </div>
       </div>
@@ -62,7 +62,8 @@
   <div class="main">
     <div class="card" style="margin-bottom:16px;">
       <div class="card-body" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <span><i class="ti ti-info-circle"></i> Todo corre en tu navegador con TensorFlow.js + KNN. No requiere Python ni servidor.</span>
+  <span><i class="ti ti-info-circle"></i> Todo corre en tu navegador con TensorFlow.js + KNN. No requiere Python ni servidor.</span>
+  <span class="badge ok" title="Página de entrenamiento"><i class="ti ti-brain"></i> Modo: Entrenamiento</span>
         <span id="statusBadge" class="badge warn">Cargando modelo...</span>
       </div>
     </div>
@@ -81,25 +82,24 @@
       </div>
 
       <div class="card">
-        <div class="card-header"><i class="ti ti-language"></i> Traducción</div>
+        <div class="card-header"><i class="ti ti-brain"></i> Entrenamiento y predicción</div>
         <div class="card-body">
           <div class="controls" style="margin-bottom:10px;">
+            <button id="btnAdd" class="btn btn-success"><i class="ti ti-plus"></i> Agregar ejemplo</button>
             <button id="btnPredict" class="btn btn-warning"><i class="ti ti-bolt"></i> Predecir (1 captura)</button>
             <button id="btnStreamStart" class="btn btn-warning"><i class="ti ti-player-play"></i> Iniciar continuo</button>
             <button id="btnStreamStop" class="btn btn-danger"><i class="ti ti-player-pause"></i> Detener continuo</button>
           </div>
           <div class="controls" style="margin-bottom:10px;">
+            <input id="labelInput" type="text" placeholder="Nombre de la seña (ej. Hola)" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;flex:1;min-width:200px;">
+            <button id="btnSave" class="btn btn-outline"><i class="ti ti-download"></i> Guardar modelo</button>
             <button id="btnLoad" class="btn btn-outline"><i class="ti ti-upload"></i> Cargar modelo</button>
             <button id="btnLoadDefault" class="btn btn-outline" title="Cargar modelo de ejemplo del servidor"><i class="ti ti-cloud-download"></i> Cargar Modelo (Defecto)</button>
           </div>
           <div class="status">
             <div><strong>Estado:</strong> <span id="statusText" class="mono">Inicializando...</span></div>
-            <div><strong>Texto:</strong></div>
-            <textarea id="textoAcumulado" class="mono" rows="3" style="width:100%;resize:vertical;" readonly></textarea>
-            <div class="controls" style="margin:6px 0 10px 0;">
-              <button id="btnCopyText" class="btn btn-outline" title="Copiar texto acumulado al portapapeles"><i class="ti ti-copy"></i> Copiar</button>
-              <button id="btnClearText" class="btn btn-secondary" title="Borrar texto acumulado"><i class="ti ti-trash"></i> Borrar</button>
-            </div>
+            <div><strong>Seña:</strong> <span id="predText" class="mono">—</span></div>
+            <div><strong>Confianza:</strong> <span id="confText" class="mono">—</span></div>
             <div><strong>Ejemplos totales:</strong> <span id="exCount" class="mono">0</span></div>
             <div><strong>Último error:</strong> <span id="lastErr" class="mono">—</span></div>
           </div>
@@ -131,17 +131,19 @@
     const els = {
       badge: document.getElementById('statusBadge'),
       text: document.getElementById('statusText'),
-      out: document.getElementById('textoAcumulado'),
       exCount: document.getElementById('exCount'),
       err: document.getElementById('lastErr'),
+      pred: document.getElementById('predText'),
+      conf: document.getElementById('confText'),
+      label: document.getElementById('labelInput'),
       
       btnPredict: document.getElementById('btnPredict'),
       btnStreamStart: document.getElementById('btnStreamStart'),
       btnStreamStop: document.getElementById('btnStreamStop'),
       btnLoad: document.getElementById('btnLoad'),
       btnLoadDefault: document.getElementById('btnLoadDefault'),
-      btnCopyText: document.getElementById('btnCopyText'),
-      btnClearText: document.getElementById('btnClearText')
+      btnAdd: document.getElementById('btnAdd'),
+      btnSave: document.getElementById('btnSave')
     };
 
     function setStatus(msg, cls) {
@@ -194,17 +196,18 @@
       setStatus(`Ejemplo agregado a "${label}"`,'ok');
     }
 
-    let currentLabel = '';
-
-    function appendText(s){ try { els.out.value += s; els.out.scrollTop = els.out.scrollHeight; } catch{} }
-
     async function predictOnce() {
       try {
         if (classifier.getNumClasses()===0) { setStatus('Entrena primero','warn'); return; }
         const activation = getActivation();
         const res = await classifier.predictClass(activation);
-        const label = res.label || '';
-        currentLabel = label;
+        const label = res.label || '—';
+        els.pred.textContent = label;
+        let confidence = 0;
+        if (res && res.confidences && label in res.confidences) {
+          confidence = res.confidences[label] || 0;
+        }
+        els.conf.textContent = (confidence*100).toFixed(1) + '%';
       } catch(e) { els.err.textContent = e.toString(); }
     }
 
@@ -305,23 +308,10 @@
     els.btnStreamStop.addEventListener('click', stopStreaming);
     els.btnLoad.addEventListener('click', loadLocal);
     els.btnLoadDefault.addEventListener('click', loadDefault);
-    els.btnClearText.addEventListener('click', ()=>{ try{ els.out.value=''; setStatus('Texto borrado','warn'); }catch{} });
-    els.btnCopyText.addEventListener('click', async ()=>{
-      try{
-        const txt = els.out.value||'';
-        if (navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(txt); }
-        else { const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
-        setStatus('Texto copiado','ok');
-      }catch(e){ els.err.textContent = String(e); setStatus('No se pudo copiar','err'); }
-    });
+    els.btnAdd.addEventListener('click', addExample);
+    els.btnSave.addEventListener('click', saveLocal);
 
-    // Teclas: Enter agrega la letra actual; Espacio agrega un espacio
-    document.addEventListener('keydown', (e)=>{
-      const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
-      if (tag==='INPUT' || tag==='TEXTAREA' || (e.target && e.target.isContentEditable)) return;
-      if (e.key === 'Enter') { e.preventDefault(); if (currentLabel) appendText(currentLabel); }
-      else if (e.key === ' ') { e.preventDefault(); appendText(' '); }
-    });
+    // Sin manejadores de teclado en modo entrenamiento
 
     // Boot
     loadModel();

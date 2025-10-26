@@ -17,6 +17,9 @@
     <link rel="stylesheet" href="../admin/assets/fonts/material.css">
     <link rel="stylesheet" href="../admin/assets/css/style.css" id="main-style-link">
     <link rel="stylesheet" href="../admin/assets/css/style-preset.css">
+    <!-- Bootstrap CSS (restaurado) -->
+    <!-- Cargamos Bootstrap DESPUÉS de los estilos de la plantilla para recuperar el look & feel base de Bootstrap -->
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
     
     <style>
         body {
@@ -185,6 +188,11 @@
             flex-wrap: wrap;
         }
 
+        /*
+         | Botones custom de la plantilla (DESACTIVADOS para restaurar Bootstrap)
+         | Si deseas volver a usar el estilo personalizado, elimina este comentario
+         | y restaura el bloque. Dejamos el código visible a pedido.
+         
         .btn {
             padding: 10px 20px;
             border: none;
@@ -241,6 +249,7 @@
             cursor: not-allowed;
             transform: none;
         }
+        */
 
         /* Responsive Design */
         @media (max-width: 768px) {
@@ -408,6 +417,22 @@
             color: #0050b3;
         }
 
+        /* Badge de modo (no altera la paleta principal) */
+        .mode-badge {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #e6f7ff;
+            color: #0050b3;
+            border: 1px solid #91d5ff;
+            vertical-align: middle;
+        }
+        .accum-box { margin-top: 12px; text-align:left; }
+        .accum-text { width:100%; resize:vertical; }
+
         @media (max-width: 768px) {
             .main-container {
                 padding: 0 15px;
@@ -448,33 +473,19 @@
     </style>
 </head>
 <body>
-    <!-- Header -->
-    <div class="header">
-        <div class="container">
-            <div class="logo">
-                <img src="../admin/assets/images/logoensename.PNG" alt="EnSEÑAme">
-                <span class="logo-text">EnSEÑAme IA</span>
+    <!-- Header (replicado del portable, con colores de la página principal de usuario) -->
+    <header class="bg-primary text-white shadow-sm py-3">
+        <div class="container d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <img src="../admin/assets/images/logoensename.PNG" alt="EnSEÑAme" style="height:40px;">
+                <span class="fs-5 fw-semibold">Traductor LSC (Web)</span>
             </div>
-            <a href="../user/index.php" class="back-btn">
-                <i class="ti ti-arrow-left"></i>
-                Volver al Inicio
-            </a>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <a href="lsc_service/index_portable.html" class="btn btn-outline-light btn-sm"><i class="ti ti-brain me-1"></i> Ir a Entrenamiento</a>
+                <a href="../user/index.php" class="btn btn-light btn-sm text-primary"><i class="ti ti-arrow-left me-1"></i> Volver</a>
+            </div>
         </div>
-    </div>
-
-    <!-- Contenido Principal -->
-    <div class="main-container">
-        <!-- Alerta informativa -->
-        <div class="alert alert-info">
-            <i class="ti ti-info-circle"></i>
-            <strong>¡Bienvenido al Detector de Lenguaje de Señas Colombiano!</strong> 
-            Esta herramienta utiliza inteligencia artificial para reconocer señas en tiempo real.
-        </div>
-
-        <h1 class="page-title">
-            <i class="ti ti-brain"></i>
-            Detector de Lenguaje de Señas Colombiano
-        </h1>
+    </header>
         
         <div class="main-content">
             <div class="card video-container">
@@ -494,20 +505,20 @@
                     <div id="confidenceLevel"></div>
                 </div>
                 <p id="confidenceValue">0%</p>
+                <div class="accum-box">
+                    <label class="form-label"><strong>Texto</strong></label>
+                    <textarea id="accumulatedText" class="mono accum-text" rows="3" readonly></textarea>
+                    <div class="save-options" style="margin-top:8px;">
+                        <button type="button" class="btn btn-warning btn-sm" id="btnCopyAccum" title="Copiar texto acumulado"><i class="ti ti-copy"></i> Copiar</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="btnClearAccum" title="Borrar texto acumulado"><i class="ti ti-trash"></i> Borrar</button>
+                    </div>
+                    <p class="text-muted" style="margin-top:8px; font-size:12px;">Enter agrega la seña actual. Espacio agrega un espacio.</p>
+                </div>
             </div>
 
             <div class="training-quick">
                 <h3>Entrenamiento Rápido</h3>
                 <div class="controls">
-                    <button type="button" class="btn btn-primary btn-sm" onclick="train()">
-                        <i class="fas fa-plus"></i> Agregar Ejemplo
-                    </button>
-                    <button type="button" class="btn btn-success btn-sm" onclick="save()">
-                        <i class="fas fa-save"></i> Guardar Modelo
-                    </button>
-                    <button type="button" class="btn btn-warning btn-sm" onclick="load()">
-                        <i class="fas fa-upload"></i> Cargar Modelo
-                    </button>
                     <button type="button" class="btn btn-warning btn-sm" onclick="predictOnce()" title="Realiza una sola predicción">
                         <i class="ti ti-bolt"></i> Predecir (1 captura)
                     </button>
@@ -548,6 +559,7 @@
             classNames: []
         };
         let streamTimer = null;
+        let currentLabel = '';
 
         // Soporte para cargar modelo por defecto desde repo externo con fallback local
         const urlParams = new URLSearchParams(location.search);
@@ -645,6 +657,7 @@
                 const confidence = Math.round((result.confidences[result.label]||0) * 100);
                 confidenceLevel.style.width = `${confidence}%`;
                 confidenceValue.textContent = `${confidence}% de confianza`;
+                currentLabel = result.label || '';
                 img.dispose(); processedImg.dispose(); batchedImg.dispose();
             }
 
@@ -845,6 +858,27 @@
             window.predictOnce = function(){ predictOnce(); }
             window.startStreaming = function(){ startStreaming(); }
             window.stopStreaming = function(){ stopStreaming(); }
+
+            // Texto acumulado: copiar/borrar + teclado (Enter/Espacio)
+            const accum = document.getElementById('accumulatedText');
+            const btnCopyAccum = document.getElementById('btnCopyAccum');
+            const btnClearAccum = document.getElementById('btnClearAccum');
+            function appendText(s){ if(!s) return; accum.value += s; accum.scrollTop = accum.scrollHeight; }
+            btnClearAccum.addEventListener('click', ()=>{ accum.value=''; showStatus('Texto borrado','warning'); });
+            btnCopyAccum.addEventListener('click', async ()=>{
+                const txt = accum.value||'';
+                try{
+                    if (navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(txt); }
+                    else { const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+                    showStatus('Texto copiado','success');
+                }catch(e){ console.error(e); showStatus('No se pudo copiar','error'); }
+            });
+            document.addEventListener('keydown', (e)=>{
+                const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+                if (tag==='INPUT' || tag==='TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+                if (e.key === 'Enter') { e.preventDefault(); appendText(currentLabel); }
+                else if (e.key === ' ') { e.preventDefault(); appendText(' '); }
+            });
         });
     </script>
 
@@ -852,5 +886,7 @@
     <script src="../admin/assets/js/plugins/popper.min.js"></script>
     <script src="../admin/assets/js/plugins/simplebar.min.js"></script>
     <script src="../admin/assets/js/plugins/feather.min.js"></script>
+    <!-- Bootstrap JS (restaurado) -->
+    <script src="../js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
