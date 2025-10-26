@@ -225,7 +225,8 @@
 
     async function loadDefault() {
       try {
-        const url='../../base%20de%20datos/datos_entrenamiento_senas%20(3).json';
+        // Cargar desde ruta pública (evita 403 del directorio protegido "base de datos")
+        const url='./assets/models/default_training.json';
         const res = await fetch(url,{cache:'no-store'}); if(!res.ok) throw new Error('HTTP '+res.status);
         const loaded = await res.json();
         if(!loaded || !Array.isArray(loaded.classNames) || !loaded.examples) throw new Error('Formato inválido');
