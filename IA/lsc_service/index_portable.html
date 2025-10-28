@@ -52,7 +52,7 @@
           <span class="logo-text">LSC Portable (sin backend)</span>
         </div>
         <div class="inline">
-          <a href="./index.html" class="back-btn"><i class="ti ti-robot"></i> Ir a versión Flask</a>
+          <a href="../index.html" class="back-btn"><i class="ti ti-language"></i> Ir a Traducción</a>
           <a href="../../user/index.php" class="back-btn"><i class="ti ti-arrow-left"></i> Volver</a>
         </div>
       </div>
@@ -62,7 +62,8 @@
   <div class="main">
     <div class="card" style="margin-bottom:16px;">
       <div class="card-body" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <span><i class="ti ti-info-circle"></i> Todo corre en tu navegador con TensorFlow.js + KNN. No requiere Python ni servidor.</span>
+  <span><i class="ti ti-info-circle"></i> Todo corre en tu navegador con TensorFlow.js + KNN. No requiere Python ni servidor.</span>
+  <span class="badge ok" title="Página de entrenamiento"><i class="ti ti-brain"></i> Modo: Entrenamiento</span>
         <span id="statusBadge" class="badge warn">Cargando modelo...</span>
       </div>
     </div>
@@ -115,21 +116,34 @@
     let streamTimer=null; let examplesAdded=0;
     let trainingData = { examples: {}, classNames: [] };
 
+    // Soporte para cargar modelo por defecto desde repo externo (fallback a local)
+    const urlParams = new URLSearchParams(location.search);
+    const PARAM_MODEL_URL = urlParams.get('modelUrl');
+    const REMOTE_CANDIDATES = [
+      // Parametro explícito tiene prioridad
+      ...(PARAM_MODEL_URL ? [PARAM_MODEL_URL] : []),
+      // Rutas comunes en el repo indicado por el usuario
+      'https://raw.githubusercontent.com/DanielPedraza023/InterpretacionLSC/main/datos_entrenamiento_senas.json',
+      'https://raw.githubusercontent.com/DanielPedraza023/InterpretacionLSC/main/base%20de%20datos/datos_entrenamiento_senas%20(3).json'
+    ];
+    const LOCAL_DEFAULT_URL = './assets/models/default_training.json';
+
     const els = {
       badge: document.getElementById('statusBadge'),
       text: document.getElementById('statusText'),
-      pred: document.getElementById('predText'),
-      conf: document.getElementById('confText'),
       exCount: document.getElementById('exCount'),
       err: document.getElementById('lastErr'),
+      pred: document.getElementById('predText'),
+      conf: document.getElementById('confText'),
       label: document.getElementById('labelInput'),
-      btnAdd: document.getElementById('btnAdd'),
+      
       btnPredict: document.getElementById('btnPredict'),
       btnStreamStart: document.getElementById('btnStreamStart'),
       btnStreamStop: document.getElementById('btnStreamStop'),
-      btnSave: document.getElementById('btnSave'),
       btnLoad: document.getElementById('btnLoad'),
-      btnLoadDefault: document.getElementById('btnLoadDefault')
+      btnLoadDefault: document.getElementById('btnLoadDefault'),
+      btnAdd: document.getElementById('btnAdd'),
+      btnSave: document.getElementById('btnSave')
     };
 
     function setStatus(msg, cls) {
@@ -187,8 +201,13 @@
         if (classifier.getNumClasses()===0) { setStatus('Entrena primero','warn'); return; }
         const activation = getActivation();
         const res = await classifier.predictClass(activation);
-        const label = res.label || '—'; const conf = res.confidences[label]||0;
-        els.pred.textContent = label; els.conf.textContent = Math.round(conf*100)+'%';
+        const label = res.label || '—';
+        els.pred.textContent = label;
+        let confidence = 0;
+        if (res && res.confidences && label in res.confidences) {
+          confidence = res.confidences[label] || 0;
+        }
+        els.conf.textContent = (confidence*100).toFixed(1) + '%';
       } catch(e) { els.err.textContent = e.toString(); }
     }
 
@@ -223,30 +242,76 @@
       input.click();
     }
 
+    function unique(arr){ return Array.from(new Set(arr)); }
+    function normalizeTrainingData(loaded){
+      // A) Formato nativo
+      if (loaded && Array.isArray(loaded.classNames) && loaded.examples && typeof loaded.examples==='object') {
+        return loaded;
+      }
+      // B) { labels:[], vectors:[ [1000], ... ] }
+      if (loaded && Array.isArray(loaded.labels) && Array.isArray(loaded.vectors)){
+        const ex = {}; const names = unique(loaded.labels);
+        for(let i=0;i<loaded.labels.length;i++){
+          const lab = String(loaded.labels[i]||'');
+          const vec = loaded.vectors[i]; if(!Array.isArray(vec)) continue;
+          (ex[lab] ||= []).push(vec);
+        }
+        return { classNames: names, examples: ex };
+      }
+      // C) { classes:[], data: { label: [[1000], ...] } }
+      if (loaded && Array.isArray(loaded.classes) && loaded.data && typeof loaded.data==='object'){
+        return { classNames: loaded.classes, examples: loaded.data };
+      }
+      // D) { examples:[ {label, vector} ], classNames? }
+      if (loaded && Array.isArray(loaded.examples)){
+        const ex={}; const names=[];
+        for(const item of loaded.examples){ if(!item) continue; const lab=String(item.label||''); const vec=item.vector; if(!Array.isArray(vec)) continue; (ex[lab] ||= []).push(vec); names.push(lab); }
+        return { classNames: unique(loaded.classNames||names), examples: ex };
+      }
+      throw new Error('Formato inválido');
+    }
+
+    async function fetchWithFallback(urls){
+      for (const u of urls){
+        try{
+          const res = await fetch(u, { cache:'no-store' });
+          if (res.ok){ return await res.json(); }
+        }catch(_){ /* ignorar y continuar */ }
+      }
+      // Intenta local al final
+      const res = await fetch(LOCAL_DEFAULT_URL, { cache:'no-store' });
+      if (!res.ok) throw new Error('HTTP '+res.status);
+      return await res.json();
+    }
+
     async function loadDefault() {
       try {
-        const url='../../base%20de%20datos/datos_entrenamiento_senas%20(3).json';
-        const res = await fetch(url,{cache:'no-store'}); if(!res.ok) throw new Error('HTTP '+res.status);
-        const loaded = await res.json();
-        if(!loaded || !Array.isArray(loaded.classNames) || !loaded.examples) throw new Error('Formato inválido');
-        trainingData=loaded; classifier.clearAllClasses();
+        // Intentar repo del usuario y luego fallback local
+        const loadedRaw = await fetchWithFallback(REMOTE_CANDIDATES);
+        const normalized = normalizeTrainingData(loadedRaw);
+        if(!normalized || !Array.isArray(normalized.classNames) || !normalized.examples) throw new Error('Formato inválido');
+        trainingData = normalized; classifier.clearAllClasses();
         for(const cls of trainingData.classNames){ const list=trainingData.examples[cls]||[]; for(const ex of list){ const t=tf.tensor(ex,[1,1000]); classifier.addExample(t, cls); } }
         examplesAdded = trainingData.classNames.reduce((acc,cn)=>acc+(trainingData.examples[cn]?.length||0),0);
         els.exCount.textContent = String(examplesAdded);
-        setStatus('Modelo por defecto cargado','ok');
+        const nClases = trainingData.classNames.length;
+        if (nClases>0) { setStatus(`Modelo por defecto cargado (${nClases} clase${nClases===1?'':'s'})`,'ok'); }
+        else { setStatus('Modelo por defecto cargado (sin ejemplos)','warn'); }
       } catch(err){ els.err.textContent = err.toString(); setStatus('No se pudo cargar modelo por defecto','err'); }
     }
 
     // Wire UI
     document.getElementById('btnStartCam').addEventListener('click', startCamera);
     document.getElementById('btnStopCam').addEventListener('click', stopCamera);
-    els.btnAdd.addEventListener('click', addExample);
     els.btnPredict.addEventListener('click', predictOnce);
     els.btnStreamStart.addEventListener('click', startStreaming);
     els.btnStreamStop.addEventListener('click', stopStreaming);
-    els.btnSave.addEventListener('click', saveLocal);
     els.btnLoad.addEventListener('click', loadLocal);
     els.btnLoadDefault.addEventListener('click', loadDefault);
+    els.btnAdd.addEventListener('click', addExample);
+    els.btnSave.addEventListener('click', saveLocal);
+
+    // Sin manejadores de teclado en modo entrenamiento
 
     // Boot
     loadModel();

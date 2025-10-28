@@ -21,6 +21,9 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 
+    <!-- Bootstrap CSS (restaurado) -->
+    <!-- Cargamos Bootstrap DESPUÉS de los estilos de la plantilla para recuperar el look & feel base de Bootstrap -->
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
     
     <style>
         body {
@@ -189,6 +192,11 @@
             flex-wrap: wrap;
         }
 
+        /*
+         | Botones custom de la plantilla (DESACTIVADOS para restaurar Bootstrap)
+         | Si deseas volver a usar el estilo personalizado, elimina este comentario
+         | y restaura el bloque. Dejamos el código visible a pedido.
+         
         .btn {
             padding: 10px 20px;
             border: none;
@@ -245,6 +253,7 @@
             cursor: not-allowed;
             transform: none;
         }
+        */
 
         /* Responsive Design */
         @media (max-width: 768px) {
@@ -412,6 +421,22 @@
             color: #0050b3;
         }
 
+        /* Badge de modo (no altera la paleta principal) */
+        .mode-badge {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #e6f7ff;
+            color: #0050b3;
+            border: 1px solid #91d5ff;
+            vertical-align: middle;
+        }
+        .accum-box { margin-top: 12px; text-align:left; }
+        .accum-text { width:100%; resize:vertical; }
+
         @media (max-width: 768px) {
             .main-container {
                 padding: 0 15px;
@@ -452,33 +477,19 @@
     </style>
 </head>
 <body>
-    <!-- Header -->
-    <div class="header">
-        <div class="container">
-            <div class="logo">
-                <img src="../admin/assets/images/logoensename.PNG" alt="EnSEÑAme">
-                <span class="logo-text">EnSEÑAme IA</span>
+    <!-- Header (replicado del portable, con colores de la página principal de usuario) -->
+    <header class="bg-primary text-white shadow-sm py-3">
+        <div class="container d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <img src="../admin/assets/images/logoensename.PNG" alt="EnSEÑAme" style="height:40px;">
+                <span class="fs-5 fw-semibold">Traductor LSC (Web)</span>
             </div>
-            <a href="../user/index.php" class="back-btn">
-                <i class="ti ti-arrow-left"></i>
-                Volver al Inicio
-            </a>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <a href="lsc_service/index_portable.html" class="btn btn-outline-light btn-sm"><i class="ti ti-brain me-1"></i> Ir a Entrenamiento</a>
+                <a href="../user/index.php" class="btn btn-light btn-sm text-primary"><i class="ti ti-arrow-left me-1"></i> Volver</a>
+            </div>
         </div>
-    </div>
-
-    <!-- Contenido Principal -->
-    <div class="main-container">
-        <!-- Alerta informativa -->
-        <div class="alert alert-info">
-            <i class="ti ti-info-circle"></i>
-            <strong>¡Bienvenido al Detector de Lenguaje de Señas Colombiano!</strong> 
-            Esta herramienta utiliza inteligencia artificial para reconocer señas en tiempo real.
-        </div>
-
-        <h1 class="page-title">
-            <i class="ti ti-brain"></i>
-            Detector de Lenguaje de Señas Colombiano
-        </h1>
+    </header>
         
         <div class="main-content">
             <div class="card video-container">
@@ -498,19 +509,28 @@
                     <div id="confidenceLevel"></div>
                 </div>
                 <p id="confidenceValue">0%</p>
+                <div class="accum-box">
+                    <label class="form-label"><strong>Texto</strong></label>
+                    <textarea id="accumulatedText" class="mono accum-text" rows="3" readonly></textarea>
+                    <div class="save-options" style="margin-top:8px;">
+                        <button type="button" class="btn btn-warning btn-sm" id="btnCopyAccum" title="Copiar texto acumulado"><i class="ti ti-copy"></i> Copiar</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="btnClearAccum" title="Borrar texto acumulado"><i class="ti ti-trash"></i> Borrar</button>
+                    </div>
+                    <p class="text-muted" style="margin-top:8px; font-size:12px;">Enter agrega la seña actual. Espacio agrega un espacio.</p>
+                </div>
             </div>
 
             <div class="training-quick">
                 <h3>Entrenamiento Rápido</h3>
                 <div class="controls">
-                    <button type="button" class="btn btn-primary btn-sm" onclick="train()">
-                        <i class="fas fa-plus"></i> Agregar Ejemplo
+                    <button type="button" class="btn btn-warning btn-sm" onclick="predictOnce()" title="Realiza una sola predicción">
+                        <i class="ti ti-bolt"></i> Predecir (1 captura)
                     </button>
-                    <button type="button" class="btn btn-success btn-sm" onclick="save()">
-                        <i class="fas fa-save"></i> Guardar Modelo
+                    <button type="button" class="btn btn-warning btn-sm" onclick="startStreaming()" title="Inicia predicción continua cada segundo">
+                        <i class="ti ti-player-play"></i> Iniciar continuo
                     </button>
-                    <button type="button" class="btn btn-warning btn-sm" onclick="load()">
-                        <i class="fas fa-upload"></i> Cargar Modelo
+                    <button type="button" class="btn btn-danger btn-sm" onclick="stopStreaming()" title="Detiene la predicción continua">
+                        <i class="ti ti-player-pause"></i> Detener continuo
                     </button>
                   <button type="button" class="btn btn-outline-secondary btn-sm" onclick="loadDefault()" title="Cargar modelo de ejemplo del servidor">
                       <i class="ti ti-download"></i> Cargar Modelo (Defecto)
@@ -542,6 +562,18 @@
             examples: {},
             classNames: []
         };
+        let streamTimer = null;
+        let currentLabel = '';
+
+        // Soporte para cargar modelo por defecto desde repo externo con fallback local
+        const urlParams = new URLSearchParams(location.search);
+        const PARAM_MODEL_URL = urlParams.get('modelUrl');
+        const REMOTE_CANDIDATES = [
+            ...(PARAM_MODEL_URL ? [PARAM_MODEL_URL] : []),
+            'https://raw.githubusercontent.com/DanielPedraza023/InterpretacionLSC/main/datos_entrenamiento_senas.json',
+            'https://raw.githubusercontent.com/DanielPedraza023/InterpretacionLSC/main/base%20de%20datos/datos_entrenamiento_senas%20(3).json'
+        ];
+        const LOCAL_DEFAULT_URL = './lsc_service/assets/models/default_training.json';
 
         // Cuando la página se carga completamente
         document.addEventListener('DOMContentLoaded', function() {
@@ -668,38 +700,27 @@ window.addEventListener('load', () => {
                 console.log(`Ejemplo agregado para la clase: ${className}`);
             }
             
-            // Función para predecir la seña
-            async function predict() {
+            // Predicción de una sola captura
+            async function predictOnce() {
                 if (classifier.getNumClasses() === 0) {
-                    predictionText.textContent = 'Primero entrena el modelo con algunas señas';
+                    predictionText.textContent = 'Primero entrena o carga un modelo';
                     return;
                 }
-                
-                // Capturar el frame actual del video
                 const img = tf.browser.fromPixels(video);
                 const processedImg = tf.image.resizeBilinear(img, [224, 224]);
                 const batchedImg = processedImg.expandDims(0);
-                
-                // Obtener las activaciones de MobileNet
                 const activation = mobilenet.predict(batchedImg);
-                
-                // Predecir la clase
                 const result = await classifier.predictClass(activation);
-                
-                // Mostrar el resultado
                 predictionText.textContent = `Seña: ${result.label}`;
-                const confidence = Math.round(result.confidences[result.label] * 100);
+                const confidence = Math.round((result.confidences[result.label]||0) * 100);
                 confidenceLevel.style.width = `${confidence}%`;
                 confidenceValue.textContent = `${confidence}% de confianza`;
-                
-                // Liberar memoria
-                img.dispose();
-                processedImg.dispose();
-                batchedImg.dispose();
-                
-                // Continuar prediciendo
-                setTimeout(predict, 1000);
+                currentLabel = result.label || '';
+                img.dispose(); processedImg.dispose(); batchedImg.dispose();
             }
+
+            function startStreaming(){ if (streamTimer) return; streamTimer = setInterval(predictOnce, 1000); showStatus('Reconocimiento continuo iniciado','success'); }
+            function stopStreaming(){ if (streamTimer){ clearInterval(streamTimer); streamTimer=null; showStatus('Reconocimiento continuo detenido','warning'); } }
             
             // Función para guardar datos de entrenamiento localmente
             async function saveTrainingDataLocal() {
@@ -782,20 +803,53 @@ window.addEventListener('load', () => {
                 }
             }
 
-            // Cargar datos de entrenamiento por defecto desde el servidor
+            function unique(arr){ return Array.from(new Set(arr)); }
+            function normalizeTrainingData(loaded){
+                // A) Formato nativo
+                if (loaded && Array.isArray(loaded.classNames) && loaded.examples && typeof loaded.examples==='object') {
+                    return loaded;
+                }
+                // B) { labels:[], vectors:[[1000], ...] }
+                if (loaded && Array.isArray(loaded.labels) && Array.isArray(loaded.vectors)){
+                    const ex = {}; const names = unique(loaded.labels);
+                    for(let i=0;i<loaded.labels.length;i++){
+                        const lab = String(loaded.labels[i]||'');
+                        const vec = loaded.vectors[i]; if(!Array.isArray(vec)) continue;
+                        (ex[lab] ||= []).push(vec);
+                    }
+                    return { classNames: names, examples: ex };
+                }
+                // C) { classes:[], data:{ label:[[1000], ...] } }
+                if (loaded && Array.isArray(loaded.classes) && loaded.data && typeof loaded.data==='object'){
+                    return { classNames: loaded.classes, examples: loaded.data };
+                }
+                // D) { examples:[ {label, vector} ], classNames? }
+                if (loaded && Array.isArray(loaded.examples)){
+                    const ex={}; const names=[];
+                    for(const item of loaded.examples){ if(!item) continue; const lab=String(item.label||''); const vec=item.vector; if(!Array.isArray(vec)) continue; (ex[lab] ||= []).push(vec); names.push(lab); }
+                    return { classNames: unique(loaded.classNames||names), examples: ex };
+                }
+                throw new Error('Formato de modelo inválido');
+            }
+
+            async function fetchWithFallback(urls){
+                for (const u of urls){
+                    try{
+                        const res = await fetch(u, { cache:'no-store' });
+                        if (res.ok){ return await res.json(); }
+                    }catch(_){ /* continuar */ }
+                }
+                const res = await fetch(LOCAL_DEFAULT_URL, { cache:'no-store' });
+                if (!res.ok) throw new Error('HTTP '+res.status);
+                return await res.json();
+            }
+
+            // Cargar datos de entrenamiento por defecto desde el servidor (con fallback y normalización)
             async function loadDefaultTrainingData() {
                 try {
-                    const url = '../base%20de%20datos/datos_entrenamiento_senas%20(3).json';
-                    const res = await fetch(url, { cache: 'no-store' });
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
-                    const loadedData = await res.json();
+                    const loadedRaw = await fetchWithFallback(REMOTE_CANDIDATES);
+                    const loadedData = normalizeTrainingData(loadedRaw);
 
-                    // Validaciones mínimas
-                    if (!loadedData || !Array.isArray(loadedData.classNames) || !loadedData.examples) {
-                        throw new Error('Formato de modelo inválido');
-                    }
-
-                    // Reconstruir el clasificador
                     trainingData = loadedData;
                     classifier.clearAllClasses();
                     for (const className of trainingData.classNames) {
@@ -806,7 +860,12 @@ window.addEventListener('load', () => {
                         }
                     }
                     examplesAdded = trainingData.classNames.reduce((total, cn) => total + (trainingData.examples[cn]?.length || 0), 0);
-                    showStatus(`Modelo por defecto cargado: ${examplesAdded} ejemplos.`, 'success');
+                    const nClasses = trainingData.classNames.length;
+                    if (nClasses>0) {
+                        showStatus(`Modelo por defecto cargado: ${examplesAdded} ejemplos y ${nClasses} clases.`, 'success');
+                    } else {
+                        showStatus('Modelo por defecto cargado (sin ejemplos)', 'warning');
+                    }
                 } catch (error) {
                     console.error('Error al cargar modelo por defecto:', error);
                     showStatus('No se pudo cargar el modelo por defecto', 'error');
@@ -850,10 +909,34 @@ window.addEventListener('load', () => {
                 loadTrainingDataLocal();
             }
 
-            // Exponer carga por defecto
+            // Exponer funciones a botones
             window.loadDefault = function() {
                 loadDefaultTrainingData();
             }
+            window.predictOnce = function(){ predictOnce(); }
+            window.startStreaming = function(){ startStreaming(); }
+            window.stopStreaming = function(){ stopStreaming(); }
+
+            // Texto acumulado: copiar/borrar + teclado (Enter/Espacio)
+            const accum = document.getElementById('accumulatedText');
+            const btnCopyAccum = document.getElementById('btnCopyAccum');
+            const btnClearAccum = document.getElementById('btnClearAccum');
+            function appendText(s){ if(!s) return; accum.value += s; accum.scrollTop = accum.scrollHeight; }
+            btnClearAccum.addEventListener('click', ()=>{ accum.value=''; showStatus('Texto borrado','warning'); });
+            btnCopyAccum.addEventListener('click', async ()=>{
+                const txt = accum.value||'';
+                try{
+                    if (navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(txt); }
+                    else { const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+                    showStatus('Texto copiado','success');
+                }catch(e){ console.error(e); showStatus('No se pudo copiar','error'); }
+            });
+            document.addEventListener('keydown', (e)=>{
+                const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+                if (tag==='INPUT' || tag==='TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+                if (e.key === 'Enter') { e.preventDefault(); appendText(currentLabel); }
+                else if (e.key === ' ') { e.preventDefault(); appendText(' '); }
+            });
         });
     </script>
 
@@ -861,5 +944,7 @@ window.addEventListener('load', () => {
     <script src="../admin/assets/js/plugins/popper.min.js"></script>
     <script src="../admin/assets/js/plugins/simplebar.min.js"></script>
     <script src="../admin/assets/js/plugins/feather.min.js"></script>
+    <!-- Bootstrap JS (restaurado) -->
+    <script src="../js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
