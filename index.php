@@ -75,7 +75,7 @@
 <section class="hero-section d-flex align-items-center justify-content-center text-center text-white"
          style="background: url('admin/assets/images/inicioindex1.png') no-repeat center center/cover; height: 100vh; position: relative;">
   <div class="overlay"></div>
-  <div class="container position-relative" style="z-index: 2;">
+  <div class="container position-relative" style="z-index: 3;">
     <h1 class="display-4 fw-bold mb-3">¿Quiénes somos?</h1>
     <p class="lead mx-auto" style="max-width: 700px;">
       Somos un equipo multidisciplinario que, junto con la comunidad sorda, desarrolla una app que traduce en tiempo real el lenguaje de señas colombiano (LSC) a texto y voz.
@@ -87,7 +87,7 @@
   .hero-section {
     position: relative;
     width: 100%;
-    color: #fff; /* texto blanco */
+    color: #ffffffff; /* texto blanco */
   }
 
   .hero-section .overlay {
@@ -96,18 +96,21 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.35); /* un poco más claro para que la imagen se vea mejor */
+    background: rgba(0, 0, 0, 0.10); /* un poco más claro para que la imagen se vea mejor */
   }
 
   .hero-section h1 {
     color: #ffffff;
-    text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.7); /* sombra suave para contraste */
+    text-shadow: 2px 2px 6px rgba(0, 0, 0, 1); /* sombra suave para contraste */
   }
 
   .hero-section p {
-    color: #f1f1f1; /* gris claro, más legible */
+    color: #ffffffff; /* gris claro, más legible */
     text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.6);
   }
+
+
+
 </style>
 
 

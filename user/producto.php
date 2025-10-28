@@ -477,10 +477,10 @@ if (empty($nombre_completo)) {
               <div class="mb-3">
                 <p class="text-muted">Aprende el abecedario dactilológico y números básicos</p>
               </div>
-              <iframe width="100%" height="400"
-                src="https://www.youtube.com/embed/2FYzN7WMl7k"
-                title="Abecedario y números en LSC" frameborder="0"
-                allowfullscreen></iframe>
+          <video width="100%" height="400" controls preload="metadata">
+                <source src="../admin/assets/videos/VideoGuia2.mp4" type="video/mp4">
+                Tu navegador no soporta la reproducción de video. Puedes abrirlo en una nueva pestaña <a href="../admin/assets/videos/VideoGuia2.mp4" target="_blank">aquí</a>.
+              </video>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -504,10 +504,10 @@ if (empty($nombre_completo)) {
               <div class="mb-3">
                 <p class="text-muted">Aprende verbos esenciales y mantén conversaciones básicas en LSC</p>
               </div>
-              <iframe width="100%" height="400"
-                src="https://www.youtube.com/embed/mXtzV2OQ7M8"
-                title="Verbos y conversaciones cotidianas" frameborder="0"
-                allowfullscreen></iframe>
+             <video width="100%" height="400" controls preload="metadata">
+                <source src="../admin/assets/videos/VideoGuia3.mp4" type="video/mp4">
+                Tu navegador no soporta la reproducción de video. Puedes abrirlo en una nueva pestaña <a href="../admin/assets/videos/VideoGuia3.mp4" target="_blank">aquí</a>.
+              </video>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -531,10 +531,10 @@ if (empty($nombre_completo)) {
               <div class="mb-3">
                 <p class="text-muted">Señas para familia, relaciones y descripciones de personas</p>
               </div>
-              <iframe width="100%" height="400"
-                src="https://www.youtube.com/embed/l8wl6WCGgMo"
-                title="Familia y Relaciones en LSC" frameborder="0"
-                allowfullscreen></iframe>
+            <video width="100%" height="400" controls preload="metadata">
+                <source src="../admin/assets/videos/VideoGuia4.mp4" type="video/mp4">
+                Tu navegador no soporta la reproducción de video. Puedes abrirlo en una nueva pestaña <a href="../admin/assets/videos/VideoGuia4.mp4" target="_blank">aquí</a>.
+              </video>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -558,10 +558,11 @@ if (empty($nombre_completo)) {
               <div class="mb-3">
                 <p class="text-muted">Expresa emociones y sentimientos en LSC</p>
               </div>
-              <iframe width="100%" height="400"
-                src="https://www.youtube.com/embed/dZSKBaFpW6Y"
-                title="Emociones y Sentimientos en LSC" frameborder="0"
-                allowfullscreen></iframe>
+              <!-- AGREGAR VIDEO GUIA 5 DE MENOR TAMAÑO MB -->
+              <video width="100%" height="400" controls preload="metadata">
+                <source src="../admin/assets/videos/VideoGuia5.mp4" type="video/mp4">
+                Tu navegador no soporta la reproducción de video. Puedes abrirlo en una nueva pestaña <a href="../admin/assets/videos/VideoGuia5.mp4" target="_blank">aquí</a>.
+              </video>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -585,10 +586,10 @@ if (empty($nombre_completo)) {
               <div class="mb-3">
                 <p class="text-muted">Aprende señas para tiempo, fechas y expresiones temporales</p>
               </div>
-              <iframe width="100%" height="400"
-                src="https://www.youtube.com/embed/v4NdZczn_wY"
-                title="Tiempo y Fechas en LSC" frameborder="0"
-                allowfullscreen></iframe>
+        <video width="100%" height="400" controls preload="metadata">
+                <source src="../admin/assets/videos/VideoGuia6.mp4" type="video/mp4">
+                Tu navegador no soporta la reproducción de video. Puedes abrirlo en una nueva pestaña <a href="../admin/assets/videos/VideoGuia6.mp4" target="_blank">aquí</a>.
+              </video>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
