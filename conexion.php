@@ -70,4 +70,7 @@ if (!mysqli_set_charset($conexion, 'utf8')) {
         die("Error de configuración de base de datos.");
     }
 }
+
+$conn = $conexion;
+
 ?>
