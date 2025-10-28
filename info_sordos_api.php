@@ -1,92 +1,18 @@
 <?php
-header('Content-Type: application/json');
+// API DEPRECADA: Unificada en chatbot_api_clean.php
+header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
-// Datos educativos sobre la comunidad sorda y la sordera
-$informacion_sordos = [
-    "definicion" => [
-        "titulo" => "¿Qué es la sordera?",
-        "descripcion" => "La sordera es la pérdida total o parcial de la capacidad auditiva. Afecta aproximadamente al 5% de la población mundial (466 millones de personas según la OMS 2021). Puede ser congénita (de nacimiento) o adquirida a lo largo de la vida. La pérdida auditiva se mide en decibelios (dB) y se clasifica según su grado y tipo.",
-        "prevalencia_mundial" => [
-            "total_personas" => "466 millones",
-            "ninos" => "34 millones",
-            "adultos" => "432 millones",
-            "perdida_incapacitante" => "278 millones",
-            "proyeccion_2050" => "900 millones"
-        ],
-        "tipos" => [
-            [
-                "tipo" => "Sordera conductiva",
-                "descripcion" => "Problema en el oído externo o medio que impide que el sonido llegue al oído interno. Generalmente tratable médica o quirúrgicamente.",
-                "causas" => ["Cerumen excesivo", "Otitis media crónica", "Perforación del tímpano", "Otosclerosis", "Malformaciones congénitas"],
-                "tratamiento" => "Cirugía, medicamentos, audífonos de conducción ósea"
-            ],
-            [
-                "tipo" => "Sordera neurosensorial",
-                "descripcion" => "Daño en el oído interno (cóclea) o en el nervio auditivo. Es el tipo más común y generalmente permanente.",
-                "causas" => ["Envejecimiento (presbiacusia)", "Exposición a ruido intenso", "Genética", "Infecciones virales", "Medicamentos ototóxicos"],
-                "tratamiento" => "Audífonos, implantes cocleares, terapia de rehabilitación auditiva"
-            ],
-            [
-                "tipo" => "Sordera mixta",
-                "descripcion" => "Combinación de sordera conductiva y neurosensorial. Requiere enfoque de tratamiento múltiple.",
-                "causas" => ["Múltiples factores", "Traumas complejos", "Patologías degenerativas", "Infecciones severas"],
-                "tratamiento" => "Combinación de cirugía, audífonos e implantes según el caso"
-            ],
-            [
-                "tipo" => "Neuropatía auditiva",
-                "descripcion" => "El oído interno detecta el sonido normalmente, pero hay problemas en la transmisión al cerebro.",
-                "causas" => ["Problemas genéticos", "Hiperbilirrubinemia neonatal", "Infecciones", "Trastornos neurológicos"],
-                "tratamiento" => "Implantes cocleares, terapia de habla, sistemas FM"
-            ]
-        ]
-    ],
-    
-    "grados_perdida" => [
-        "titulo" => "Grados de pérdida auditiva",
-        "descripcion" => "La pérdida auditiva se clasifica según el umbral auditivo medido en decibelios (dB HL). Esta clasificación ayuda a determinar el tipo de apoyo y tecnología más adecuados.",
-        "clasificacion" => [
-            [
-                "grado" => "Audición normal",
-                "rango_db" => "0-20 dB",
-                "descripcion" => "No hay dificultades auditivas significativas",
-                "impacto" => "Ninguno",
-                "apoyo_requerido" => "Ninguno"
-            ],
-            [
-                "grado" => "Pérdida leve",
-                "rango_db" => "21-40 dB",
-                "descripcion" => "Dificultad para escuchar sonidos suaves y conversaciones en entornos ruidosos",
-                "impacto" => "Problemas en ambientes ruidosos, puede afectar el desarrollo del habla en niños",
-                "apoyo_requerido" => "Audífonos, sistemas FM, estrategias de comunicación"
-            ],
-            [
-                "grado" => "Pérdida moderada",
-                "rango_db" => "41-70 dB",
-                "descripcion" => "Dificultad para escuchar conversaciones normales sin amplificación",
-                "impacto" => "Necesita hablar más fuerte, dificultades en conversaciones grupales",
-                "apoyo_requerido" => "Audífonos obligatorios, terapia de habla, apoyo educativo especial"
-            ],
-            [
-                "grado" => "Pérdida severa",
-                "rango_db" => "71-90 dB",
-                "descripcion" => "Solo escucha sonidos muy fuertes, la conversación normal es inaudible",
-                "impacto" => "Dependencia visual para comunicación, retraso en desarrollo del lenguaje",
-                "apoyo_requerido" => "Audífonos potentes, implantes cocleares, LSC, educación bilingüe"
-            ],
-            [
-                "grado" => "Pérdida profunda",
-                "rango_db" => "91+ dB",
-                "descripcion" => "No escucha sonidos del habla, puede percibir vibraciones y sonidos muy intensos",
-                "impacto" => "Comunicación principalmente visual, identidad cultural sorda",
-                "apoyo_requerido" => "Implantes cocleares, LSC como lengua principal, cultura sorda"
-            ]
-        ]
-    ],
-
-    "causas_principales" => [
+http_response_code(410); // Gone
+echo json_encode([
+    'success' => false,
+    'error' => 'Este endpoint fue unificado. Usa /chatbot_api_clean.php para GET ?seccion=..., POST {"buscar":...} o POST {"mensaje":...}'.
+    'endpoint_unificado' => 'chatbot_api_clean.php'
+], JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT);
+?>
         "titulo" => "Principales causas de sordera",
         "descripcion" => "Las causas de sordera varían según la edad de aparición. Se dividen en congénitas (presentes al nacer) y adquiridas (desarrolladas después del nacimiento).",
         "congenitas" => [
