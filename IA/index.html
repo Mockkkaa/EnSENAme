@@ -532,8 +532,17 @@
                     <button type="button" class="btn btn-danger btn-sm" onclick="stopStreaming()" title="Detiene la predicción continua">
                         <i class="ti ti-player-pause"></i> Detener continuo
                     </button>
+                    <button type="button" class="btn btn-success btn-sm" onclick="train()" title="Agregar ejemplo de la seña actual para entrenar">
+                        <i class="ti ti-plus"></i> Agregar ejemplo
+                    </button>
+                    <button type="button" class="btn btn-outline-success btn-sm" onclick="save()" title="Guardar el modelo entrenado (JSON)">
+                        <i class="ti ti-device-floppy"></i> Guardar Modelo
+                    </button>
                   <button type="button" class="btn btn-outline-secondary btn-sm" onclick="loadDefault()" title="Cargar modelo de ejemplo del servidor">
                       <i class="ti ti-download"></i> Cargar Modelo (Defecto)
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" onclick="load()" title="Cargar modelo desde un archivo JSON">
+                      <i class="ti ti-upload"></i> Cargar Modelo (Archivo)
                   </button>
                   <a href="lsc_service/index_portable.html" class="btn btn-primary btn-sm" style="text-decoration:none;">
                       <i class="ti ti-cpu"></i> LSC Portable (Web)
@@ -562,8 +571,11 @@
             examples: {},
             classNames: []
         };
-        let streamTimer = null;
-        let currentLabel = '';
+    let streamTimer = null;
+    let currentLabel = '';
+    let lastPrediction = { label: '', confidence: 0, ts: 0 };
+    let lastEnterAt = 0;
+    const MIN_CONFIDENCE = 0.5; // 50%
 
         // Soporte para cargar modelo por defecto desde repo externo con fallback local
         const urlParams = new URLSearchParams(location.search);
@@ -573,7 +585,16 @@
             'https://raw.githubusercontent.com/DanielPedraza023/InterpretacionLSC/main/datos_entrenamiento_senas.json',
             'https://raw.githubusercontent.com/DanielPedraza023/InterpretacionLSC/main/base%20de%20datos/datos_entrenamiento_senas%20(3).json'
         ];
-        const LOCAL_DEFAULT_URL = './lsc_service/assets/models/default_training.json';
+        // Usar explícitamente el entrenamiento 4 como predeterminado
+        const LOCAL_DEFAULT_URL = '../base%20de%20datos/datos_entrenamiento_senas%20(4).json';
+        // Rutas locales adicionales (con espacios codificados) por si existen datos fuera de IA/
+        const LOCAL_EXTRA_CANDIDATES = [
+            // Fallbacks locales adicionales
+            './lsc_service/assets/models/default_training.json',
+            '../base%20de%20datos/datos_entrenamiento_senas%20(3).json',
+            '../base%20de%20datos/datos_entrenamiento_senas.json',
+            './lsc_service/assets/models/datos_entrenamiento_senas.json'
+        ];
 
         // Cuando la página se carga completamente
         document.addEventListener('DOMContentLoaded', function() {
@@ -704,7 +725,7 @@ window.addEventListener('load', () => {
             async function predictOnce() {
                 if (classifier.getNumClasses() === 0) {
                     predictionText.textContent = 'Primero entrena o carga un modelo';
-                    return;
+                    return null;
                 }
                 const img = tf.browser.fromPixels(video);
                 const processedImg = tf.image.resizeBilinear(img, [224, 224]);
@@ -712,11 +733,40 @@ window.addEventListener('load', () => {
                 const activation = mobilenet.predict(batchedImg);
                 const result = await classifier.predictClass(activation);
                 predictionText.textContent = `Seña: ${result.label}`;
-                const confidence = Math.round((result.confidences[result.label]||0) * 100);
-                confidenceLevel.style.width = `${confidence}%`;
-                confidenceValue.textContent = `${confidence}% de confianza`;
+                const confidence = (result.confidences[result.label]||0);
+                const confPct = Math.round(confidence * 100);
+                confidenceLevel.style.width = `${confPct}%`;
+                confidenceValue.textContent = `${confPct}% de confianza`;
                 currentLabel = result.label || '';
+                lastPrediction = { label: currentLabel, confidence, ts: Date.now() };
                 img.dispose(); processedImg.dispose(); batchedImg.dispose();
+                return { label: currentLabel, confidence };
+            }
+
+            async function predictBurst(frames=3, gapMs=120){
+                const results = [];
+                for (let i=0;i<frames;i++){
+                    const r = await predictOnce();
+                    if (r) results.push(r);
+                    if (i<frames-1) await new Promise(res=>setTimeout(res,gapMs));
+                }
+                if (results.length===0) return null;
+                // Agrupar por etiqueta y promediar confianza
+                const agg = {};
+                for (const r of results){
+                    if (!r.label) continue;
+                    if (!agg[r.label]) agg[r.label] = {sum:0,count:0};
+                    agg[r.label].sum += r.confidence;
+                    agg[r.label].count += 1;
+                }
+                let bestLabel = '';
+                let bestScore = -1;
+                for (const [lab, v] of Object.entries(agg)){
+                    const avg = v.sum / Math.max(1,v.count);
+                    if (avg > bestScore){ bestScore = avg; bestLabel = lab; }
+                }
+                if (!bestLabel) return null;
+                return { label: bestLabel, confidence: bestScore };
             }
 
             function startStreaming(){ if (streamTimer) return; streamTimer = setInterval(predictOnce, 1000); showStatus('Reconocimiento continuo iniciado','success'); }
@@ -837,17 +887,17 @@ window.addEventListener('load', () => {
                     try{
                         const res = await fetch(u, { cache:'no-store' });
                         if (res.ok){ return await res.json(); }
-                    }catch(_){ /* continuar */ }
+                    }catch(_){ /* continuar con el siguiente */ }
                 }
-                const res = await fetch(LOCAL_DEFAULT_URL, { cache:'no-store' });
-                if (!res.ok) throw new Error('HTTP '+res.status);
-                return await res.json();
+                throw new Error('No se pudo cargar ningún modelo de las fuentes indicadas');
             }
 
             // Cargar datos de entrenamiento por defecto desde el servidor (con fallback y normalización)
             async function loadDefaultTrainingData() {
                 try {
-                    const loadedRaw = await fetchWithFallback(REMOTE_CANDIDATES);
+                    // Orden solicitado: usar como predeterminado el #4 (local)
+                    const ORDERED_SOURCES = [LOCAL_DEFAULT_URL, ...LOCAL_EXTRA_CANDIDATES, ...REMOTE_CANDIDATES];
+                    const loadedRaw = await fetchWithFallback(ORDERED_SOURCES);
                     const loadedData = normalizeTrainingData(loadedRaw);
 
                     trainingData = loadedData;
@@ -864,11 +914,11 @@ window.addEventListener('load', () => {
                     if (nClasses>0) {
                         showStatus(`Modelo por defecto cargado: ${examplesAdded} ejemplos y ${nClasses} clases.`, 'success');
                     } else {
-                        showStatus('Modelo por defecto cargado (sin ejemplos)', 'warning');
+                        showStatus('Modelo por defecto cargado (sin ejemplos). Usa Agregar ejemplo o Cargar Modelo (Archivo).', 'warning');
                     }
                 } catch (error) {
                     console.error('Error al cargar modelo por defecto:', error);
-                    showStatus('No se pudo cargar el modelo por defecto', 'error');
+                    showStatus('No se pudo cargar el modelo por defecto. Usa Cargar Modelo (Archivo).', 'error');
                 }
             }
 
@@ -931,11 +981,50 @@ window.addEventListener('load', () => {
                     showStatus('Texto copiado','success');
                 }catch(e){ console.error(e); showStatus('No se pudo copiar','error'); }
             });
-            document.addEventListener('keydown', (e)=>{
+            document.addEventListener('keydown', async (e)=>{
                 const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
-                if (tag==='INPUT' || tag==='TEXTAREA' || (e.target && e.target.isContentEditable)) return;
-                if (e.key === 'Enter') { e.preventDefault(); appendText(currentLabel); }
-                else if (e.key === ' ') { e.preventDefault(); appendText(' '); }
+                const isAccum = (e.target && e.target.id === 'accumulatedText');
+                // Permitimos Enter/Espacio incluso dentro del textarea acumulado (readonly)
+                if (!isAccum && (tag==='INPUT' || tag==='TEXTAREA' || (e.target && e.target.isContentEditable))) return;
+
+                const isEnter = (e.key === 'Enter' || e.code === 'NumpadEnter');
+                const isSpace = (e.key === ' ' || e.code === 'Space');
+
+                if (!(isEnter || isSpace)) return;
+
+                // Debounce para evitar repetidos por autorepeat
+                const now = Date.now();
+                if (now - lastEnterAt < 200) { e.preventDefault(); return; }
+                lastEnterAt = now;
+
+                if (isSpace) {
+                    e.preventDefault();
+                    appendText(' ');
+                    return;
+                }
+
+                if (isEnter) {
+                    e.preventDefault();
+                    // Usar predicción reciente si es confiable y reciente (<=1500ms)
+                    const fresh = (now - lastPrediction.ts) <= 1500;
+                    if (fresh && lastPrediction.label && lastPrediction.confidence >= MIN_CONFIDENCE) {
+                        appendText(lastPrediction.label);
+                        showStatus(`Agregado: ${lastPrediction.label}`,'success');
+                        return;
+                    }
+                    // Si no hay predicción reciente, intentar una rápida
+                    if (classifier.getNumClasses() === 0) {
+                        showStatus('Entrena o carga un modelo antes de usar Enter','warning');
+                        return;
+                    }
+                    const res = await predictBurst(3, 120);
+                    if (res && res.label && res.confidence >= MIN_CONFIDENCE) {
+                        appendText(res.label);
+                        showStatus(`Agregado: ${res.label}`,'success');
+                    } else {
+                        showStatus('Predicción no confiable. Intenta de nuevo o agrega ejemplos.','warning');
+                    }
+                }
             });
         });
     </script>

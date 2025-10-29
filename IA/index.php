@@ -179,44 +179,159 @@ $display_name = isset($_SESSION['display_name']) && $_SESSION['display_name'] !=
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier@1.2.2"></script>
   <script>
-    let video, classifier, mobilenet; let isModelReady=false, isVideoReady=false; let streamTimer=null; let currentLabel='';
+    // Variables y configuración
+    let video, classifier, mobilenet; let isModelReady=false, isVideoReady=false; let streamTimer=null;
     let trainingData = { examples:{}, classNames:[] };
+    let currentLabel='';
+    let lastPrediction = { label:'', confidence:0, ts:0 };
+    let lastEnterAt = 0;
+    const MIN_CONFIDENCE = 0.5; // 50%
+
     const urlParams = new URLSearchParams(location.search);
     const PARAM_MODEL_URL = urlParams.get('modelUrl');
-    const REMOTE_CANDIDATES = [ ...(PARAM_MODEL_URL ? [PARAM_MODEL_URL] : []), 'https://raw.githubusercontent.com/DanielPedraza023/InterpretacionLSC/main/datos_entrenamiento_senas.json', 'https://raw.githubusercontent.com/DanielPedraza023/InterpretacionLSC/main/base%20de%20datos/datos_entrenamiento_senas%20(3).json' ];
-    const LOCAL_DEFAULT_URL = './lsc_service/assets/models/default_training.json';
+    // Fuentes remotas opcionales
+    const REMOTE_CANDIDATES = [
+      ...(PARAM_MODEL_URL ? [PARAM_MODEL_URL] : []),
+      'https://raw.githubusercontent.com/DanielPedraza023/InterpretacionLSC/main/datos_entrenamiento_senas.json',
+      'https://raw.githubusercontent.com/DanielPedraza023/InterpretacionLSC/main/base%20de%20datos/datos_entrenamiento_senas%20(3).json'
+    ];
+    // Usar explícitamente entrenamiento 4 como predeterminado
+    const LOCAL_DEFAULT_URL = '../base%20de%20datos/datos_entrenamiento_senas%20(4).json';
+    const LOCAL_FALLBACKS = [
+      './lsc_service/assets/models/default_training.json',
+      '../base%20de%20datos/datos_entrenamiento_senas%20(3).json',
+      '../base%20de%20datos/datos_entrenamiento_senas.json'
+    ];
 
     document.addEventListener('DOMContentLoaded', async ()=>{
       video = document.getElementById('video');
       const predictionText = document.getElementById('predictionText');
       const confidenceLevel = document.getElementById('confidenceLevel');
       const confidenceValue = document.getElementById('confidenceValue');
+
       classifier = knnClassifier.create();
       mobilenet = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
       isModelReady=true; predictionText.textContent='Modelo cargado. Usa los botones de arriba para interactuar.';
-      try{ const stream = await navigator.mediaDevices.getUserMedia({ video:{ width:640, height:480 } }); video.srcObject=stream; await video.play(); isVideoReady=true; }catch(e){ predictionText.textContent='Error: No se pudo acceder a la cámara.'; }
+      try { const stream = await navigator.mediaDevices.getUserMedia({ video:{ width:640, height:480 } }); video.srcObject=stream; await video.play(); isVideoReady=true; }
+      catch(_) { predictionText.textContent='Error: No se pudo acceder a la cámara.'; }
 
       function showStatus(msg){ predictionText.textContent = msg; setTimeout(()=>{ predictionText.textContent='Listo para usar'; }, 3000); }
       function getActivation(){ const img=tf.browser.fromPixels(video); const processed=tf.image.resizeBilinear(img,[224,224]); const batched=processed.expandDims(0); const act=mobilenet.predict(batched); img.dispose(); processed.dispose(); return act; }
 
-      async function predictOnceImpl(){ if (classifier.getNumClasses()===0){ predictionText.textContent='Primero carga un modelo por defecto'; return; } const act=getActivation(); const res=await classifier.predictClass(act); currentLabel=res.label||''; const conf=Math.round((res.confidences[res.label]||0)*100); confidenceLevel.style.width=conf+'%'; confidenceValue.textContent=conf+'%'; }
+      async function predictOnceImpl(){
+        if (classifier.getNumClasses()===0){ predictionText.textContent='Primero carga un modelo por defecto'; return null; }
+        const act=getActivation();
+        const res=await classifier.predictClass(act);
+        currentLabel=res.label||'';
+        const conf=(res.confidences[res.label]||0);
+        const confPct=Math.round(conf*100);
+        confidenceLevel.style.width=confPct+'%';
+        confidenceValue.textContent=confPct+'%';
+        lastPrediction = { label: currentLabel, confidence: conf, ts: Date.now() };
+        return { label: currentLabel, confidence: conf };
+      }
+
+      async function predictBurst(frames=3, gapMs=120){
+        const results=[];
+        for(let i=0;i<frames;i++){
+          const r = await predictOnceImpl();
+          if(r) results.push(r);
+          if(i<frames-1) await new Promise(res=>setTimeout(res,gapMs));
+        }
+        if(results.length===0) return null;
+        const agg={};
+        for(const r of results){
+          if(!r.label) continue;
+          if(!agg[r.label]) agg[r.label]={sum:0,count:0};
+          agg[r.label].sum += r.confidence;
+          agg[r.label].count += 1;
+        }
+        let bestLabel=''; let bestScore=-1;
+        for(const [lab,v] of Object.entries(agg)){
+          const avg=v.sum/Math.max(1,v.count);
+          if(avg>bestScore){ bestScore=avg; bestLabel=lab; }
+        }
+        if(!bestLabel) return null;
+        return { label: bestLabel, confidence: bestScore };
+      }
+
       function startStreamingImpl(){ if(streamTimer) return; streamTimer=setInterval(predictOnceImpl,1000); showStatus('Reconocimiento continuo iniciado'); }
       function stopStreamingImpl(){ if(streamTimer){ clearInterval(streamTimer); streamTimer=null; showStatus('Reconocimiento continuo detenido'); } }
 
       function unique(a){ return Array.from(new Set(a)); }
-      function normalizeTrainingData(loaded){ if(loaded && Array.isArray(loaded.classNames) && loaded.examples && typeof loaded.examples==='object'){ return loaded; } if(loaded && Array.isArray(loaded.labels) && Array.isArray(loaded.vectors)){ const ex={}; const names=unique(loaded.labels); for(let i=0;i<loaded.labels.length;i++){ const lab=String(loaded.labels[i]||''); const vec=loaded.vectors[i]; if(!Array.isArray(vec)) continue; (ex[lab] ||= []).push(vec);} return { classNames:names, examples:ex }; } if(loaded && Array.isArray(loaded.classes) && loaded.data && typeof loaded.data==='object'){ return { classNames:loaded.classes, examples:loaded.data }; } if(loaded && Array.isArray(loaded.examples)){ const ex={}; const names=[]; for(const item of loaded.examples){ if(!item) continue; const lab=String(item.label||''); const vec=item.vector; if(!Array.isArray(vec)) continue; (ex[lab] ||= []).push(vec); names.push(lab);} return { classNames:unique(loaded.classNames||names), examples:ex }; } throw new Error('Formato de modelo inválido'); }
-
-      async function fetchWithFallback(urls){ for(const u of urls){ try{ const r=await fetch(u,{cache:'no-store'}); if(r.ok) return await r.json(); }catch(_){ } } const r=await fetch(LOCAL_DEFAULT_URL,{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
-      window.loadDefault = async function(){ try{ const raw=await fetchWithFallback(REMOTE_CANDIDATES); const norm=normalizeTrainingData(raw); trainingData=norm; classifier.clearAllClasses(); for(const cls of trainingData.classNames){ const list=trainingData.examples[cls]||[]; for(const ex of list){ const t=tf.tensor(ex,[1,1000]); classifier.addExample(t, cls);} } const total = trainingData.classNames.reduce((acc,cn)=>acc+(trainingData.examples[cn]?.length||0),0); showStatus('Modelo por defecto cargado: '+total+' ejemplos'); }catch(e){ showStatus('No se pudo cargar el modelo por defecto'); }
+      function normalizeTrainingData(loaded){
+        if(loaded && Array.isArray(loaded.classNames) && loaded.examples && typeof loaded.examples==='object') return loaded;
+        if(loaded && Array.isArray(loaded.labels) && Array.isArray(loaded.vectors)){
+          const ex={}; const names=unique(loaded.labels);
+          for(let i=0;i<loaded.labels.length;i++){ const lab=String(loaded.labels[i]||''); const vec=loaded.vectors[i]; if(!Array.isArray(vec)) continue; (ex[lab] ||= []).push(vec); }
+          return { classNames:names, examples:ex };
+        }
+        if(loaded && Array.isArray(loaded.classes) && loaded.data && typeof loaded.data==='object') return { classNames:loaded.classes, examples:loaded.data };
+        if(loaded && Array.isArray(loaded.examples)){
+          const ex={}; const names=[];
+          for(const item of loaded.examples){ if(!item) continue; const lab=String(item.label||''); const vec=item.vector; if(!Array.isArray(vec)) continue; (ex[lab] ||= []).push(vec); names.push(lab); }
+          return { classNames:unique(loaded.classNames||names), examples:ex };
+        }
+        throw new Error('Formato de modelo inválido');
       }
-      window.predictOnce = ()=>predictOnceImpl();
+
+      async function fetchWithFallback(urls){
+        for(const u of urls){
+          try{ const r=await fetch(u,{cache:'no-store'}); if(r.ok) return await r.json(); }catch(_){ }
+        }
+        throw new Error('No se pudo cargar ningún modelo');
+      }
+
+      window.loadDefault = async function(){
+        try{
+          const ordered = [LOCAL_DEFAULT_URL, ...LOCAL_FALLBACKS, ...REMOTE_CANDIDATES];
+          const raw = await fetchWithFallback(ordered);
+          const norm = normalizeTrainingData(raw);
+          trainingData = norm;
+          classifier.clearAllClasses();
+          for(const cls of trainingData.classNames){
+            const list = trainingData.examples[cls]||[];
+            for(const ex of list){ const t=tf.tensor(ex,[1,1000]); classifier.addExample(t, cls); }
+          }
+          const total = trainingData.classNames.reduce((acc,cn)=>acc+(trainingData.examples[cn]?.length||0),0);
+          showStatus('Modelo por defecto cargado: '+total+' ejemplos');
+        }catch(e){ showStatus('No se pudo cargar el modelo por defecto'); }
+      }
+      window.predictOnce = ()=>{ predictOnceImpl(); };
       window.startStreaming = ()=>startStreamingImpl();
       window.stopStreaming = ()=>stopStreamingImpl();
 
+      // Manejo de texto acumulado y teclado (Enter/Espacio) con debounce y umbral de confianza
       const accum = document.getElementById('accumulatedText');
       document.getElementById('btnClearAccum').addEventListener('click', ()=>{ accum.value=''; showStatus('Texto borrado'); });
       document.getElementById('btnCopyAccum').addEventListener('click', async ()=>{ const txt=accum.value||''; try{ if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(txt);} else { const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);} showStatus('Texto copiado'); }catch(e){ showStatus('No se pudo copiar'); } });
-      document.addEventListener('keydown', (e)=>{ const tag=(e.target && e.target.tagName)?e.target.tagName.toUpperCase():''; if(tag==='INPUT'||tag==='TEXTAREA'||(e.target&&e.target.isContentEditable)) return; if(e.key==='Enter'){ e.preventDefault(); if(currentLabel){ accum.value+=currentLabel; } } else if(e.key===' '){ e.preventDefault(); accum.value+=' '; } });
+
+      document.addEventListener('keydown', async (e)=>{
+        const tag=(e.target && e.target.tagName)?e.target.tagName.toUpperCase():'';
+        if(tag==='INPUT'||tag==='TEXTAREA'||(e.target&&e.target.isContentEditable)) return;
+        const isEnter=(e.key==='Enter'||e.code==='NumpadEnter');
+        const isSpace=(e.key===' '||e.code==='Space');
+        if(!(isEnter||isSpace)) return;
+
+        const now=Date.now();
+        if(now-lastEnterAt<200){ e.preventDefault(); return; }
+        lastEnterAt=now;
+
+        if(isSpace){ e.preventDefault(); accum.value+=' '; return; }
+        if(isEnter){
+          e.preventDefault();
+          const fresh=(now - lastPrediction.ts) <= 1500;
+          if(fresh && lastPrediction.label && lastPrediction.confidence >= MIN_CONFIDENCE){
+            accum.value += lastPrediction.label;
+            showStatus('Agregado: '+lastPrediction.label);
+            return;
+          }
+          if(classifier.getNumClasses()===0){ showStatus('Carga un modelo antes de usar Enter'); return; }
+          const res = await predictBurst(3,120);
+          if(res && res.label && res.confidence >= MIN_CONFIDENCE){ accum.value += res.label; showStatus('Agregado: '+res.label); }
+          else { showStatus('Predicción no confiable. Intenta nuevamente.'); }
+        }
+      });
     });
   </script>
 
